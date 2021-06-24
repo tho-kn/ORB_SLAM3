@@ -1324,7 +1324,6 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
                 continue;
             if (!(*itKF)->mPrevKF)
                 continue;
-
             dirG -= (*itKF)->mPrevKF->GetImuRotation()*(*itKF)->mpImuPreintegrated->GetUpdatedDeltaVelocity();
             cv::Mat _vel = ((*itKF)->GetImuPosition() - (*itKF)->mPrevKF->GetImuPosition())/(*itKF)->mpImuPreintegrated->dT;
             (*itKF)->SetVelocity(_vel);
@@ -1332,6 +1331,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
         }
 
         dirG = dirG/cv::norm(dirG);
+        std::cout<<"dirG: "<<dirG<<"\n";
         cv::Mat gI = (cv::Mat_<float>(3,1) << 0.0f, 0.0f, -1.0f);
         cv::Mat v = gI.cross(dirG);
         const float nv = cv::norm(v);
