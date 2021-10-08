@@ -33,7 +33,7 @@ using namespace std;
 int main(int argc, char **argv) {
   if (argc != 4) {
     cerr << endl
-         << "Usage: ./mono_tum path_to_vocabulary path_to_settings "
+         << "Usage: ./mono_gopro path_to_vocabulary path_to_settings "
             "path_to_gopro_video"
          << endl;
     return 1;
@@ -59,6 +59,8 @@ int main(int argc, char **argv) {
   int cnt_empty_frame = 0;
   int img_id = 0;
   int nImages = cap.get(cv::CAP_PROP_FRAME_COUNT);
+  double fps = cap.get(cv::CAP_PROP_FPS);
+  double frame_diff_s = 1./fps;
   while (1) {
     cv::Mat im,im_track;
     bool success = cap.read(im);
@@ -97,18 +99,15 @@ int main(int argc, char **argv) {
           std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1)
               .count();
 
-//      vTimesTrack.push_back(ttrack);
+      if (img_id % 100 == 0) {
+        std::cout<<"Video FPS: "<<1./frame_diff_s<<"\n";
+        std::cout<<"ORB-SLAM 3 running at: "<<1./ttrack<< " FPS\n";
+      }
+      vTimesTrack.push_back(ttrack);
 
-//      // Wait to load the next frame
-//      double T = 0;
-//      if (img_id < nImages - 1)
-//        T = vTimestamps[img_id + 1] - tframe;
-//      else if (img_id > 0)
-//        T = tframe - vTimestamps[img_id - 1];
-
-//      if (ttrack < T)
-//        usleep((T - ttrack) * 1e6);
-      cv::waitKey(10);
+      // Wait to load the next frame
+      if (ttrack < frame_diff_s)
+        usleep((frame_diff_s - ttrack) * 1e6);
   }
 
   //    // Stop all threads

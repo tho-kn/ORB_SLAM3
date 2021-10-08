@@ -1,4 +1,33 @@
-# ORB-SLAM3
+# GoPro ORB-SLAM3
+
+In this fork I tested some modifications to see if ORB-SLAM3 could be run with GoPro cameras, especially in the Visual-Inertial setting.
+
+Modern GoPro cameras come equipped with an IMU. The sensor stream is encoded in the final .MP4 video file and can be extracted using the [gmpf-parser](https://github.com/gopro/gpmf-parser). According to [this thread](https://github.com/gopro/gpmf-parser/issues/90) starting from GoPro8 the timestamps come from the hardware and we could assume that they are accurate enough to perform visual inertial odometry or SLAM.
+
+I've used the [telemetry extractor](https://github.com/JuanIrache/gopro-telemetry) to extract the meta data to a json file. The IMU stream is actually in sync with the video stream. You just have to substract the first IMU timestamp from all IMU timestamps (or add the first one to the camera timestamps).
+
+## How to run VI-ORB-SLAM3 with your GoPro
+
+### Extract telemetry
+First extract the telemetry json from the video file. This can be done using the script located [here](https://github.com/urbste/OpenImuCameraCalibrator/tree/master/javascript):
+
+### Calibrate your camera
+If you own a GoPro9 you could try to run it with my settings located in the Exampled/ folder. Therefore you can record your videos in FullHD (1920x1080) in Wide or Linear mode and use the *.yaml files: [wide setting](Examples/Monocular-Inertial/gopro9_wide_setting.yaml) or [linear setting](Examples/Monocular-Inertial/gopro9_linear_setting.yaml).
+However, the preferred way is to calibrate your GoPro first.
+
+To do this you can use [OpenICC](https://github.com/urbste/OpenImuCameraCalibrator/). This will output the camera to IMU transformation matrix and an intrinsic camera calibration.
+
+### Calibrate your IMU noise parameters
+Follow the instructions [here](https://github.com/urbste/OpenImuCameraCalibrator#estimate-imu-noise-parameters) to estimate the random walk and noise density for both accelerometer and gyroscope.
+
+
+## Modifications
+- Added DoubleSphere camera model
+- Added GoPro 9 settings for FullHD videos and Wide or Linear lens settings
+
+To reduce the rolling shutter effect as much as possible you can run the GoPro at a higher framerate >=50fps and with a very high shutter speed at <1/800. However in my first experiments it also seems to work quite nicely with 25fps and automatic shutter.
+
+
 
 ### V0.4: Beta version, 21 April 2021
 **Authors:** Carlos Campos, Richard Elvira, Juan J. Gómez Rodríguez, [José M. M. Montiel](http://webdiis.unizar.es/~josemari/), [Juan D. Tardos](http://webdiis.unizar.es/~jdtardos/).

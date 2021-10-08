@@ -181,6 +181,7 @@ void LocalMapping::Run()
                 // Initialize IMU here
                 if(!mpCurrentKeyFrame->GetMap()->isImuInitialized() && mbInertial)
                 {
+                    std::cout<<"Trying to initialize IMU\n";
                     if (mbMonocular)
                         InitializeIMU(1e2, 1e10, true);
                     else
@@ -1331,7 +1332,6 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
         }
 
         dirG = dirG/cv::norm(dirG);
-        std::cout<<"dirG: "<<dirG<<"\n";
         cv::Mat gI = (cv::Mat_<float>(3,1) << 0.0f, 0.0f, -1.0f);
         cv::Mat v = gI.cross(dirG);
         const float nv = cv::norm(v);
@@ -1356,8 +1356,10 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
     Optimizer::InertialOptimization(mpAtlas->GetCurrentMap(), mRwg, mScale, mbg, mba, mbMonocular, infoInertial, false, false, priorG, priorA);
     std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+    std::cout<<"Init mbg: "<<mbg<<"\n";
+    std::cout<<"Init mba: "<<mba<<"\n";
 
-    if (mScale<1e-1)
+    if (mScale<1e-3)
     {
         cout << "scale too small" << endl;
         bInitializing=false;
