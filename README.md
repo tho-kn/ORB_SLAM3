@@ -4,7 +4,7 @@ In this fork I tested some modifications to see if ORB-SLAM3 could be run with G
 
 Modern GoPro cameras come equipped with an IMU. The sensor stream is encoded in the final .MP4 video file and can be extracted using the [gmpf-parser](https://github.com/gopro/gpmf-parser). According to [this thread](https://github.com/gopro/gpmf-parser/issues/90) starting from GoPro8 the timestamps come from the hardware and we could assume that they are accurate enough to perform visual inertial odometry or SLAM.
 
-I've used the [telemetry extractor](https://github.com/JuanIrache/gopro-telemetry) to extract the meta data to a json file. The IMU stream is actually in sync with the video stream. You just have to substract the first IMU timestamp from all IMU timestamps (or add the first one to the camera timestamps).
+I've used the [telemetry extractor](https://github.com/JuanIrache/gopro-telemetry) to extract the meta data to a json file. The IMU stream is actually in sync with the video stream. You just have to substract the first IMU timestamp from all IMU timestamps (or add the first one to the camera timestamps) [like here](https://github.com/urbste/ORB_SLAM3/blob/feature/gopro_slam/Examples/Monocular-Inertial/mono_inertial_gopro_vi.cc#L198).
 
 ## How to run VI-ORB-SLAM3 with your GoPro
 
@@ -22,8 +22,8 @@ Follow the instructions [here](https://github.com/urbste/OpenImuCameraCalibrator
 
 
 ## Modifications
-- Added DoubleSphere camera model
 - Added GoPro 9 settings for FullHD videos and Wide or Linear lens settings
+- Added DoubleSphere camera model
 
 To reduce the rolling shutter effect as much as possible you can run the GoPro at a higher framerate >=50fps and with a very high shutter speed at <1/800. However in my first experiments it also seems to work quite nicely with 25fps and automatic shutter.
 
