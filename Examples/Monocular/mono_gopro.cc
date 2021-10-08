@@ -39,6 +39,15 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  // open settings to get image resolution
+  cv::FileStorage fsSettings(argv[2], cv::FileStorage::READ);
+  if(!fsSettings.isOpened()) {
+     cerr << "Failed to open settings file at: " << argv[2] << endl;
+     exit(-1);
+  }
+  cv::Size img_size(fsSettings["Camera.width"],fsSettings["Camera.height"]);
+  fsSettings.release();
+
   // Retrieve paths to images
   vector<double> vTimestamps;
   // Create SLAM system. It initializes all system threads and gets ready to
@@ -74,7 +83,7 @@ int main(int argc, char **argv) {
       im_track = im.clone();
       double tframe = cap.get(cv::CAP_PROP_POS_MSEC) * 1e-3;
       ++img_id;
-      cv::resize(im_track, im_track, cv::Size(640, 360));
+      cv::resize(im_track, im_track, img_size);
 
 #ifdef COMPILEDWITHC11
       std::chrono::steady_clock::time_point t1 =

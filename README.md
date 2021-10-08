@@ -6,6 +6,14 @@ Modern GoPro cameras come equipped with an IMU. The sensor stream is encoded in 
 
 I've used the [telemetry extractor](https://github.com/JuanIrache/gopro-telemetry) to extract the meta data to a json file. The IMU stream is actually in sync with the video stream. You just have to substract the first IMU timestamp from all IMU timestamps (or add the first one to the camera timestamps) [like here](https://github.com/urbste/ORB_SLAM3/blob/feature/gopro_slam/Examples/Monocular-Inertial/mono_inertial_gopro_vi.cc#L198).
 
+
+## Modifications to original codebase
+- Added GoPro 9 settings for FullHD videos and Wide or Linear lens settings
+- Added GoPro 9 settings for 1440ü videos with MaxLens Mod and fisheye setting
+- Added DoubleSphere camera model
+
+To reduce the rolling shutter effect as much as possible you can run the GoPro at a higher framerate >=50fps and with a very high shutter speed at <1/800. However in my first experiments it also seems to work quite nicely with 25fps and automatic shutter.
+
 ## How to run VI-ORB-SLAM3 with your GoPro
 
 ### Extract telemetry
@@ -20,13 +28,12 @@ To do this you can use [OpenICC](https://github.com/urbste/OpenImuCameraCalibrat
 ### Calibrate your IMU noise parameters
 Follow the instructions [here](https://github.com/urbste/OpenImuCameraCalibrator#estimate-imu-noise-parameters) to estimate the random walk and noise density for both accelerometer and gyroscope.
 
+### Example videos:
+[GoPro9_25fps_1080](https://youtu.be/0wIqkUEjhiw)
 
-## Modifications
-- Added GoPro 9 settings for FullHD videos and Wide or Linear lens settings
-- Added DoubleSphere camera model
+[GoPro9_50fps_1080](https://youtu.be/IOpty7u7_04)
 
-To reduce the rolling shutter effect as much as possible you can run the GoPro at a higher framerate >=50fps and with a very high shutter speed at <1/800. However in my first experiments it also seems to work quite nicely with 25fps and automatic shutter.
-
+[GoPro9_25fps_1440_maxlens_fisheye](https://youtu.be/Phw_OVP6sxI)
 
 
 ### V0.4: Beta version, 21 April 2021
