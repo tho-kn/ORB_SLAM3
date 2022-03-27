@@ -151,14 +151,13 @@ protected:
     Map* mpCurrentMap;
 
     std::vector<GeometricCamera*> mvpCameras;
-<<<<<<< HEAD
+
     std::vector<KannalaBrandt8*> mvpBackupCamKan;
     std::vector<DoubleSphere*> mvpBackupCamDS;
     std::vector<Pinhole*> mvpBackupCamPin;
 
     std::mutex mMutexAtlas;
-=======
->>>>>>> 4452a3c4ab75b1cde34e5505a36ec3f9edcdc4c4
+
 
     unsigned long int mnLastInitKFidMap;
 
