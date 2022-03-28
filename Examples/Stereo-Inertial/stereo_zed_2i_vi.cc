@@ -26,29 +26,36 @@
 
 #include<System.h>
 
+#include<json.h>
+
 using namespace std;
 
 void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
-                vector<string> &vstrImageRight, vector<double> &vTimestamps);
+                vector<string> &vstrImageRight, vector<uint64_t> &vTimestamps);
+
+void LoadIMU(const string &strPathToSequence, vector<cv::Point3f> &acclData,
+             vector<cv::Point3f> &gyroData, vector<uint64_t> &vTimestamps);
 
 int main(int argc, char **argv)
 {
-    if(argc != 4)
-    {
-        cerr << endl << "Usage: ./stereo_kitti path_to_vocabulary path_to_settings path_to_sequence" << endl;
+    if(argc != 4) {
+        cerr << endl << "Usage: ./stereo_zed_2i_vi path_to_vocabulary path_to_settings path_to_sequence" << endl;
         return 1;
     }
 
     // Retrieve paths to images
     vector<string> vstrImageLeft;
     vector<string> vstrImageRight;
-    vector<double> vTimestamps;
+    vector<cv::Point3f> vAcc;
+    vector<cv::Point3f> vGyr;
+    vector<uint64_t> vTimestampsImu;
+    vector<uint64_t> vTimestamps;
     LoadImages(string(argv[3]), vstrImageLeft, vstrImageRight, vTimestamps);
-
+    LoadIMU(string(argv[3]), vAcc, vGyr, vTimestampsImu);
     const int nImages = vstrImageLeft.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::STEREO,true);
+    ORB_SLAM3::System SLAM(argv[1], argv[2], ORB_SLAM3::System::IMU_STEREO, true);
     float imageScale = SLAM.GetImageScale();
 
     // Vector for tracking time statistics
@@ -64,12 +71,15 @@ int main(int argc, char **argv)
 
     // Main loop
     cv::Mat imLeft, imRight;
+
+    size_t last_imu_idx = 0;
     for(int ni=0; ni<nImages; ni++)
     {
+        vector<ORB_SLAM3::IMU::Point> vImuMeas;
         // Read left and right images from file
         imLeft = cv::imread(vstrImageLeft[ni],cv::IMREAD_UNCHANGED); //,cv::IMREAD_UNCHANGED);
         imRight = cv::imread(vstrImageRight[ni],cv::IMREAD_UNCHANGED); //,cv::IMREAD_UNCHANGED);
-        double tframe = vTimestamps[ni];
+        double tframe = vTimestamps[ni]*1e-9;
 
         if(imLeft.empty())
         {
@@ -108,8 +118,17 @@ int main(int argc, char **argv)
         std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
 
+        // Load imu measurements from previous frame
+        vImuMeas.clear();
+        while(vTimestampsImu[last_imu_idx]*1e-9 <= tframe && tframe > 0)
+        {
+            vImuMeas.push_back(ORB_SLAM3::IMU::Point(vAcc[last_imu_idx].x,vAcc[last_imu_idx].y,vAcc[last_imu_idx].z,
+                                                     vGyr[last_imu_idx].x,vGyr[last_imu_idx].y,vGyr[last_imu_idx].z,
+                                                     vTimestampsImu[last_imu_idx]*1e-9));
+            last_imu_idx++;
+        }
         // Pass the images to the SLAM system
-        SLAM.TrackStereo(imLeft,imRight,tframe);
+        SLAM.TrackStereo(imLeft,imRight,tframe,vImuMeas);
 
 #ifdef COMPILEDWITHC14
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -129,9 +148,9 @@ int main(int argc, char **argv)
         // Wait to load the next frame
         double T=0;
         if(ni<nImages-1)
-            T = vTimestamps[ni+1]-tframe;
+            T = vTimestamps[ni+1]*1e-9-tframe;
         else if(ni>0)
-            T = tframe-vTimestamps[ni-1];
+            T = tframe-vTimestamps[ni-1]*1e-9;
 
         if(ttrack<T)
             usleep((T-ttrack)*1e6);
@@ -157,28 +176,56 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
-                vector<string> &vstrImageRight, vector<double> &vTimestamps)
-{
+void LoadIMU(const string &strPathToSequence, vector<cv::Point3f> &acclData,
+             vector<cv::Point3f> &gyroData, vector<uint64_t> &vTimestamps) {
+
     ifstream fTimes;
-    string strPathTimeFile = strPathToSequence + "/times.txt";
+    string strPathTimeFile = strPathToSequence + "/sensor_data.json";
     fTimes.open(strPathTimeFile.c_str());
-    while(!fTimes.eof())
-    {
-        string s;
-        getline(fTimes,s);
-        if(!s.empty())
-        {
-            stringstream ss;
-            ss << s;
-            double t;
-            ss >> t;
-            vTimestamps.push_back(t);
-        }
+    std::ifstream in(strPathTimeFile);
+    nlohmann::json sensor_data;
+    in >> sensor_data;
+
+    for(const auto& it : sensor_data["angular_velocity"].items()) {
+        const cv::Point3f gyro = cv::Point3f(
+                    M_PI/180.f*(float)sensor_data["angular_velocity"][it.key()][0],
+                    M_PI/180.f*(float)sensor_data["angular_velocity"][it.key()][1],
+                    M_PI/180.f*(float)sensor_data["angular_velocity"][it.key()][2]);
+        gyroData.push_back(gyro);
+        const uint64_t t_ns = std::stod(it.key());
+        vTimestamps.push_back(t_ns);
     }
 
-    string strPrefixLeft = strPathToSequence + "/image_0/";
-    string strPrefixRight = strPathToSequence + "/image_1/";
+    for(const auto& it : sensor_data["linear_acceleration"].items()) {
+        const cv::Point3f accl = cv::Point3f(
+                    sensor_data["linear_acceleration"][it.key()][0],
+                    sensor_data["linear_acceleration"][it.key()][1],
+                    sensor_data["linear_acceleration"][it.key()][2]);
+        acclData.push_back(accl);
+    }
+}
+
+
+void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
+                vector<string> &vstrImageRight, vector<uint64_t> &vTimestamps)
+{
+    ifstream fTimes;
+    string strPathTimeFile = strPathToSequence + "/test_poses.json";
+    fTimes.open(strPathTimeFile.c_str());
+    std::ifstream in(strPathTimeFile);
+    nlohmann::json cam_poses;
+    in >> cam_poses;
+
+    for(const auto& it : cam_poses["camera_pose"].items()) {
+        const uint64_t t_ns = std::stoll(it.key());
+        vTimestamps.push_back(t_ns);
+        std::cout << it.key() << " : " << t_ns << "\n";
+
+    }
+
+    string strPrefixLeft = strPathToSequence + "/test_images/left/left_";
+    string strPrefixRight = strPathToSequence + "/test_images/right/right_";
+
 
     const int nTimes = vTimestamps.size();
     vstrImageLeft.resize(nTimes);
@@ -188,7 +235,7 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
     {
         stringstream ss;
         ss << setfill('0') << setw(6) << i;
-        vstrImageLeft[i] = strPrefixLeft + ss.str() + ".png";
-        vstrImageRight[i] = strPrefixRight + ss.str() + ".png";
+        vstrImageLeft[i] = strPrefixLeft + std::to_string(vTimestamps[i]) + ".png";
+        vstrImageRight[i] = strPrefixRight + std::to_string(vTimestamps[i]) + ".png";
     }
 }

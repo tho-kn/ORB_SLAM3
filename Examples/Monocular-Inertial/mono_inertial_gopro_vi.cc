@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
       }
 
 
-#ifdef COMPILEDWITHC11
+#ifdef COMPILEDWITHC14
       std::chrono::steady_clock::time_point t1 =
           std::chrono::steady_clock::now();
 #else
@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
       // Pass the image to the SLAM system
       SLAM.TrackMonocular(im_track, tframe, vImuMeas);
 
-#ifdef COMPILEDWITHC11
+#ifdef COMPILEDWITHC14
       std::chrono::steady_clock::time_point t2 =
           std::chrono::steady_clock::now();
 #else

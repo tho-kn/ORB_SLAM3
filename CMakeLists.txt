@@ -7,25 +7,25 @@ ENDIF()
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall   -O3")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -w -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -O3")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 
 # Check C++11 or C++0x support
 include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
 if(COMPILER_SUPPORTS_CXX11)
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-   add_definitions(-DCOMPILEDWITHC11)
-   message(STATUS "Using flag -std=c++11.")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+   add_definitions(-DCOMPILEDWITHC14)
+   message(STATUS "Using flag -std=c++14.")
 elseif(COMPILER_SUPPORTS_CXX0X)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
    add_definitions(-DCOMPILEDWITHC0X)
    message(STATUS "Using flag -std=c++0x.")
 else()
-   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++14 support. Please use a different C++ compiler.")
 endif()
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
@@ -76,7 +76,7 @@ src/ImuTypes.cc
 src/G2oTypes.cc
 src/CameraModels/Pinhole.cpp
 src/CameraModels/KannalaBrandt8.cpp
-src/CameraModels/DoubleSphere.cpp
+#src/CameraModels/DoubleSphere.cpp
 src/OptimizableTypes.cpp
 src/MLPnPsolver.cpp
 src/GeometricTools.cc
@@ -106,7 +106,7 @@ include/G2oTypes.h
 include/CameraModels/GeometricCamera.h
 include/CameraModels/Pinhole.h
 include/CameraModels/KannalaBrandt8.h
-include/CameraModels/DoubleSphere.h
+#include/CameraModels/DoubleSphere.h
 include/OptimizableTypes.h
 include/MLPnPsolver.h
 include/GeometricTools.h
@@ -284,6 +284,10 @@ if(realsense2_FOUND)
             Examples/Calibration/recorder_realsense_T265.cc)
     target_link_libraries(recorder_realsense_T265 ${PROJECT_NAME})
 endif()
+
+add_executable(stereo_zed_2i_vi
+        Examples/Stereo-Inertial/stereo_zed_2i_vi.cc)
+target_link_libraries(stereo_zed_2i_vi ${PROJECT_NAME})
 
 #Old examples
 
