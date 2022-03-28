@@ -156,9 +156,6 @@ protected:
     std::vector<DoubleSphere*> mvpBackupCamDS;
     std::vector<Pinhole*> mvpBackupCamPin;
 
-    std::mutex mMutexAtlas;
-
-
     unsigned long int mnLastInitKFidMap;
 
     Viewer* mpViewer;

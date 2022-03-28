@@ -38,7 +38,7 @@ find_package(OpenCV 4.4)
 MESSAGE("OPENCV VERSION:")
 MESSAGE(${OpenCV_VERSION})
 
-find_package(Eigen3 3.1.0 REQUIRED)
+find_package(Eigen3 3.3.7 REQUIRED)
 find_package(Pangolin REQUIRED)
 find_package(realsense2)
 
@@ -165,6 +165,10 @@ endif()
 
 #Stereo examples
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/Stereo)
+
+add_executable(stereo_zed_2i
+        Examples/Stereo/stereo_zed_2i.cc)
+target_link_libraries(stereo_zed_2i ${PROJECT_NAME})
 
 add_executable(stereo_kitti
         Examples/Stereo/stereo_kitti.cc)

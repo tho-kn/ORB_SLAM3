@@ -68,14 +68,8 @@ cv::Point2f DoubleSphere::project(const cv::Point3f &p3D) {
                      mvParameters[1] * my + mvParameters[3]);
 }
 
-cv::Point2f DoubleSphere::project(const cv::Matx31f &m3D) {
-  return this->project(cv::Point3f(m3D(0), m3D(1), m3D(2)));
-}
-
-cv::Point2f DoubleSphere::project(const cv::Mat &m3D) {
-  const float *p3D = m3D.ptr<float>();
-
-  return this->project(cv::Point3f(p3D[0], p3D[1], p3D[2]));
+Eigen::Vector2f DoubleSphere::project(const Eigen::Vector3f &m3D) {
+  return this->project(Eigen::Vector3d(m3D(0), m3D(1), m3D(2)));
 }
 
 Eigen::Vector2d DoubleSphere::project(const Eigen::Vector3d &v3D) {
@@ -121,26 +115,18 @@ Eigen::Vector2d DoubleSphere::project(const Eigen::Vector3d &v3D) {
   return res;
 }
 
-cv::Mat DoubleSphere::projectMat(const cv::Point3f &p3D) {
-  cv::Point2f point = this->project(p3D);
-  cv::Mat ret = (cv::Mat_<float>(2, 1) << point.x, point.y);
-  return ret.clone();
+Eigen::Vector2f DoubleSphere::projectMat(const cv::Point3f &p3D) {
+  const cv::Point2f point = this->project(p3D);
+  return Eigen::Vector2f(point.x, point.y);
 }
 
 float DoubleSphere::uncertainty2(const Eigen::Matrix<double, 2, 1> &p2D) {
   return 1.f;
 }
 
-cv::Mat DoubleSphere::unprojectMat(const cv::Point2f &p2D) {
-  cv::Point3f ray = this->unproject(p2D);
-  cv::Mat ret = (cv::Mat_<float>(3, 1) << ray.x, ray.y, ray.z);
-  return ret.clone();
-}
-
-cv::Matx31f DoubleSphere::unprojectMat_(const cv::Point2f &p2D) {
-  cv::Point3f ray = this->unproject(p2D);
-  cv::Matx31f r{ray.x, ray.y, ray.z};
-  return r;
+Eigen::Vector3f DoubleSphere::unprojectEig(const cv::Point2f &p2D) {
+  const cv::Point3f ray = this->unproject(p2D);
+  return Eigen::Vector3f(ray.x,ray.y,ray.z);
 }
 
 cv::Point3f DoubleSphere::unproject(const cv::Point2f &p2D) {
@@ -177,64 +163,6 @@ cv::Point3f DoubleSphere::unproject(const cv::Point2f &p2D) {
   const double z = k * mz - xi;
 
   return cv::Point3f(x / z, y / z, 1.f);
-}
-
-cv::Mat DoubleSphere::projectJac(const cv::Point3f &p3D) {
-
-  cv::Mat Jac = cv::Mat::zeros(2, 3, CV_32F);
-  const double &xi = mvParameters[4];
-  const double &alpha = mvParameters[5];
-
-  const double &fx = mvParameters[0];
-  const double &fy = mvParameters[1];
-
-  const double &x = p3D.x;
-  const double &y = p3D.y;
-  const double &z = p3D.z;
-
-  const double xx = x * x;
-  const double yy = y * y;
-  const double zz = z * z;
-
-  const double r2 = xx + yy;
-
-  const double d1_2 = r2 + zz;
-  const double d1 = sqrt(d1_2);
-
-  const double w1 = alpha > 0.5 ? (1.0 - alpha) / alpha : alpha / (1.0 - alpha);
-  const double w2 = (w1 + xi) / sqrt(2.0 * w1 * xi + xi * xi + 1.0);
-  if (z <= -w2 * d1) {
-    return Jac;
-  }
-
-  const double k = xi * d1 + z;
-  const double kk = k * k;
-
-  const double d2_2 = r2 + kk;
-  const double d2 = sqrt(d2_2);
-
-  const double norm = alpha * d2 + (double(1) - alpha) * k;
-  const double norm2 = norm * norm;
-  const double xy = x * y;
-  const double tt2 = xi * z / d1 + double(1);
-
-  const double d_norm_d_r2 =
-      (xi * (double(1) - alpha) / d1 + alpha * (xi * k / d1 + double(1)) / d2) /
-      norm2;
-
-  const double tmp2 =
-      ((double(1) - alpha) * tt2 + alpha * k * tt2 / d2) / norm2;
-
-  Jac.ptr<float>(0)[0] = fx * (double(1) / norm - xx * d_norm_d_r2);
-  Jac.ptr<float>(1)[0] = -fy * xy * d_norm_d_r2;
-
-  Jac.ptr<float>(0)[1] = -fx * xy * d_norm_d_r2;
-  Jac.ptr<float>(1)[1] = fy * (double(1) / norm - yy * d_norm_d_r2);
-
-  Jac.ptr<float>(0)[2] = -fx * x * tmp2;
-  Jac.ptr<float>(1)[2] = -fy * y * tmp2;
-
-  return Jac.clone();
 }
 
 Eigen::Matrix<double, 2, 3>
@@ -296,16 +224,11 @@ DoubleSphere::projectJac(const Eigen::Vector3d &v3D) {
   return JacGood;
 }
 
-cv::Mat DoubleSphere::unprojectJac(const cv::Point2f &p2D) { return cv::Mat(); }
-
 bool DoubleSphere::ReconstructWithTwoViews(
-    const std::vector<cv::KeyPoint> &vKeys1,
-    const std::vector<cv::KeyPoint> &vKeys2, const std::vector<int> &vMatches12,
-    cv::Mat &R21, cv::Mat &t21, std::vector<cv::Point3f> &vP3D,
-    std::vector<bool> &vbTriangulated) {
+        const std::vector<cv::KeyPoint>& vKeys1, const std::vector<cv::KeyPoint>& vKeys2, const std::vector<int> &vMatches12,
+        Sophus::SE3f &T21, std::vector<cv::Point3f> &vP3D, std::vector<bool> &vbTriangulated) {
   if (!tvr) {
-    cv::Mat K = cv::Mat::eye(3,3,CV_32F);// this->toK();
-    tvr = new TwoViewReconstruction(K);
+    tvr = new TwoViewReconstruction(this->toK_());
   }
 
   // Correct FishEye distortion
@@ -320,8 +243,7 @@ bool DoubleSphere::ReconstructWithTwoViews(
     vKeysUn2[i].pt.x = pt3.x / pt3.z;
     vKeysUn2[i].pt.y = pt3.y / pt3.z;
   }
-  return tvr->Reconstruct(vKeysUn1, vKeysUn2, vMatches12, R21, t21, vP3D,
-                          vbTriangulated);
+  return tvr->Reconstruct(vKeysUn1,vKeysUn2,vMatches12,T21,vP3D,vbTriangulated);
 }
 
 cv::Mat DoubleSphere::toK() {
@@ -330,8 +252,9 @@ cv::Mat DoubleSphere::toK() {
   return K;
 }
 
-cv::Matx33f DoubleSphere::toK_() {
-  cv::Matx33f K{mvParameters[0],
+Eigen::Matrix3f DoubleSphere::toK_() {
+  Eigen::Matrix3f K;
+  K<<mvParameters[0],
                 0.f,
                 mvParameters[2],
                 0.f,
@@ -339,73 +262,48 @@ cv::Matx33f DoubleSphere::toK_() {
                 mvParameters[3],
                 0.f,
                 0.f,
-                1.f};
-
+                1.f;
   return K;
 }
 
-bool DoubleSphere::epipolarConstrain(GeometricCamera *pCamera2,
-                                     const cv::KeyPoint &kp1,
-                                     const cv::KeyPoint &kp2,
-                                     const cv::Mat &R12, const cv::Mat &t12,
-                                     const float sigmaLevel, const float unc) {
-  cv::Mat p3D;
-  return this->TriangulateMatches(pCamera2, kp1, kp2, R12, t12, sigmaLevel, unc,
-                                  p3D) > 0.0001f;
+bool DoubleSphere::epipolarConstrain(GeometricCamera* pCamera2,
+    const cv::KeyPoint &kp1, const cv::KeyPoint &kp2,
+    const Eigen::Matrix3f& R12, const Eigen::Vector3f& t12,
+    const float sigmaLevel, const float unc) {
+   Eigen::Vector3f p3D;
+   return this->TriangulateMatches(pCamera2,kp1,kp2,R12,t12,sigmaLevel,unc,p3D) > 0.0001f;
 }
 
-bool DoubleSphere::epipolarConstrain_(GeometricCamera *pCamera2,
-                                      const cv::KeyPoint &kp1,
-                                      const cv::KeyPoint &kp2,
-                                      const cv::Matx33f &R12,
-                                      const cv::Matx31f &t12,
-                                      const float sigmaLevel, const float unc) {
-  cv::Matx31f p3D;
-  return this->TriangulateMatches_(pCamera2, kp1, kp2, R12, t12, sigmaLevel,
-                                   unc, p3D) > 0.0001f;
-}
-
-bool DoubleSphere::matchAndtriangulate(const cv::KeyPoint &kp1,
-                                       const cv::KeyPoint &kp2,
-                                       GeometricCamera *pOther, cv::Mat &Tcw1,
-                                       cv::Mat &Tcw2, const float sigmaLevel1,
-                                       const float sigmaLevel2,
-                                       cv::Mat &x3Dtriangulated) {
-  cv::Mat Rcw1 = Tcw1.colRange(0, 3).rowRange(0, 3);
-  cv::Mat Rwc1 = Rcw1.t();
-  cv::Mat tcw1 = Tcw1.rowRange(0, 3).col(3);
-
-  cv::Mat Rcw2 = Tcw2.colRange(0, 3).rowRange(0, 3);
-  cv::Mat Rwc2 = Rcw2.t();
-  cv::Mat tcw2 = Tcw2.rowRange(0, 3).col(3);
+bool DoubleSphere::matchAndtriangulate(const cv::KeyPoint& kp1, const cv::KeyPoint& kp2, GeometricCamera* pOther,
+                                       Sophus::SE3f& Tcw1, Sophus::SE3f& Tcw2,
+                                       const float sigmaLevel1, const float sigmaLevel2,
+                                       Eigen::Vector3f& x3Dtriangulated){
+  Eigen::Matrix<float,3,4> eigTcw1 = Tcw1.matrix3x4();
+  Eigen::Matrix3f Rcw1 = eigTcw1.block<3,3>(0,0);
+  Eigen::Matrix3f Rwc1 = Rcw1.transpose();
+  Eigen::Matrix<float,3,4> eigTcw2 = Tcw2.matrix3x4();
+  Eigen::Matrix3f Rcw2 = eigTcw2.block<3,3>(0,0);
+  Eigen::Matrix3f Rwc2 = Rcw2.transpose();
 
   cv::Point3f ray1c = this->unproject(kp1.pt);
   cv::Point3f ray2c = pOther->unproject(kp2.pt);
 
-  cv::Mat r1(3, 1, CV_32F);
-  r1.at<float>(0) = ray1c.x;
-  r1.at<float>(1) = ray1c.y;
-  r1.at<float>(2) = ray1c.z;
+  Eigen::Vector3f r1(ray1c.x, ray1c.y, ray1c.z);
+  Eigen::Vector3f r2(ray2c.x, ray2c.y, ray2c.z);
 
-  cv::Mat r2(3, 1, CV_32F);
-  r2.at<float>(0) = ray2c.x;
-  r2.at<float>(1) = ray2c.y;
-  r2.at<float>(2) = ray2c.z;
+  //Check parallax between rays
+  Eigen::Vector3f ray1 = Rwc1 * r1;
+  Eigen::Vector3f ray2 = Rwc2 * r2;
 
-  // Check parallax between rays
-  cv::Mat ray1 = Rwc1 * r1;
-  cv::Mat ray2 = Rwc2 * r2;
+  const float cosParallaxRays = ray1.dot(ray2)/(ray1.norm() * ray2.norm());
 
-  const float cosParallaxRays =
-      ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
-
-  // If parallax is lower than 0.9998, reject this match
-  if (cosParallaxRays > 0.9998) {
-    return false;
+  //If parallax is lower than 0.9998, reject this match
+  if(cosParallaxRays > 0.9998){
+      return false;
   }
 
-  // Parallax is good, so we try to triangulate
-  cv::Point2f p11, p22;
+  //Parallax is good, so we try to triangulate
+  cv::Point2f p11,p22;
 
   p11.x = ray1c.x;
   p11.y = ray1c.y;
@@ -413,207 +311,122 @@ bool DoubleSphere::matchAndtriangulate(const cv::KeyPoint &kp1,
   p22.x = ray2c.x;
   p22.y = ray2c.y;
 
-  cv::Mat x3D;
+  Eigen::Vector3f x3D;
 
-  Triangulate(p11, p22, Tcw1, Tcw2, x3D);
+  this->Triangulate(p11,p22,eigTcw1,eigTcw2,x3D);
 
-  cv::Mat x3Dt = x3D.t();
-
-  // Check triangulation in front of cameras
-  float z1 = Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2);
-  if (z1 <= 0) { // Point is not in front of the first camera
-    return false;
+  //Check triangulation in front of cameras
+  float z1 = Rcw1.row(2).dot(x3D)+Tcw1.translation()(2);
+  if(z1<=0){  //Point is not in front of the first camera
+      return false;
   }
 
-  float z2 = Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2);
-  if (z2 <= 0) { // Point is not in front of the first camera
-    return false;
+
+  float z2 = Rcw2.row(2).dot(x3D)+Tcw2.translation()(2);
+  if(z2<=0){ //Point is not in front of the first camera
+      return false;
   }
 
-  // Check reprojection error in first keyframe
+  //Check reprojection error in first keyframe
   //  -Transform point into camera reference system
-  cv::Mat x3D1 = Rcw1 * x3D + tcw1;
-  cv::Point2f uv1 = this->project(x3D1);
+  Eigen::Vector3f x3D1 = Rcw1 * x3D + Tcw1.translation();
+  Eigen::Vector2f uv1 = this->project(x3D1);
 
-  float errX1 = uv1.x - kp1.pt.x;
-  float errY1 = uv1.y - kp1.pt.y;
+  float errX1 = uv1(0) - kp1.pt.x;
+  float errY1 = uv1(1) - kp1.pt.y;
 
-  if ((errX1 * errX1 + errY1 * errY1) >
-      5.991 * sigmaLevel1) { // Reprojection error is high
-    return false;
+  if((errX1*errX1+errY1*errY1)>5.991*sigmaLevel1){   //Reprojection error is high
+      return false;
   }
 
-  // Check reprojection error in second keyframe;
+  //Check reprojection error in second keyframe;
   //  -Transform point into camera reference system
-  cv::Mat x3D2 = Rcw2 * x3D + tcw2;
-  cv::Point2f uv2 = pOther->project(x3D2);
+  Eigen::Vector3f x3D2 = Rcw2 * x3D + Tcw2.translation(); // avoid using q
+  Eigen::Vector2f uv2 = pOther->project(x3D2);
 
-  float errX2 = uv2.x - kp2.pt.x;
-  float errY2 = uv2.y - kp2.pt.y;
+  float errX2 = uv2(0) - kp2.pt.x;
+  float errY2 = uv2(1) - kp2.pt.y;
 
-  if ((errX2 * errX2 + errY2 * errY2) >
-      5.991 * sigmaLevel2) { // Reprojection error is high
-    return false;
+  if((errX2*errX2+errY2*errY2)>5.991*sigmaLevel2){   //Reprojection error is high
+      return false;
   }
 
-  // Since parallax is big enough and reprojection errors are low, this pair of
-  // points can be considered as a match
-  x3Dtriangulated = x3D.clone();
+  //Since parallax is big enough and reprojection errors are low, this pair of points
+  //can be considered as a match
+  x3Dtriangulated = x3D;
 
   return true;
 }
 
-float DoubleSphere::TriangulateMatches(GeometricCamera *pCamera2,
-                                       const cv::KeyPoint &kp1,
-                                       const cv::KeyPoint &kp2,
-                                       const cv::Mat &R12, const cv::Mat &t12,
-                                       const float sigmaLevel, const float unc,
-                                       cv::Mat &p3D) {
-  cv::Mat r1 = this->unprojectMat(kp1.pt);
-  cv::Mat r2 = pCamera2->unprojectMat(kp2.pt);
+float DoubleSphere::TriangulateMatches(GeometricCamera *pCamera2, const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, const Eigen::Matrix3f& R12, const Eigen::Vector3f& t12, const float sigmaLevel, const float unc, Eigen::Vector3f& p3D) {
 
-  // Check parallax
-  cv::Mat r21 = R12 * r2;
+    Eigen::Vector3f r1 = this->unprojectEig(kp1.pt);
+    Eigen::Vector3f r2 = pCamera2->unprojectEig(kp2.pt);
 
-  const float cosParallaxRays = r1.dot(r21) / (cv::norm(r1) * cv::norm(r21));
+    //Check parallax
+    Eigen::Vector3f r21 = R12 * r2;
 
-  if (cosParallaxRays > 0.9998) {
-    return -1;
-  }
+    const float cosParallaxRays = r1.dot(r21)/(r1.norm() *r21.norm());
 
-  // Parallax is good, so we try to triangulate
-  cv::Point2f p11, p22;
-  const float *pr1 = r1.ptr<float>();
-  const float *pr2 = r2.ptr<float>();
+    if(cosParallaxRays > 0.9998){
+        return -1;
+    }
 
-  p11.x = pr1[0];
-  p11.y = pr1[1];
+    //Parallax is good, so we try to triangulate
+    cv::Point2f p11,p22;
 
-  p22.x = pr2[0];
-  p22.y = pr2[1];
+    p11.x = r1[0];
+    p11.y = r1[1];
 
-  cv::Mat x3D;
-  cv::Mat Tcw1 = (cv::Mat_<float>(3, 4) << 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f,
-                  0.f, 0.f, 0.f, 1.f, 0.f);
-  cv::Mat Tcw2;
-  cv::Mat R21 = R12.t();
-  cv::Mat t21 = -R21 * t12;
-  cv::hconcat(R21, t21, Tcw2);
+    p22.x = r2[0];
+    p22.y = r2[1];
 
-  Triangulate(p11, p22, Tcw1, Tcw2, x3D);
-  cv::Mat x3Dt = x3D.t();
+    Eigen::Vector3f x3D;
+    Eigen::Matrix<float,3,4> Tcw1;
+    Tcw1 << Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero();
 
-  float z1 = x3D.at<float>(2);
-  if (z1 <= 0) {
-    return -1;
-  }
+    Eigen::Matrix<float,3,4> Tcw2;
 
-  float z2 = R21.row(2).dot(x3Dt) + t21.at<float>(2);
-  if (z2 <= 0) {
-    return -1;
-  }
+    Eigen::Matrix3f R21 = R12.transpose();
+    Tcw2 << R21, -R21 * t12;
 
-  // Check reprojection error
-  cv::Point2f uv1 = this->project(x3D);
 
-  float errX1 = uv1.x - kp1.pt.x;
-  float errY1 = uv1.y - kp1.pt.y;
+    Triangulate(p11,p22,Tcw1,Tcw2,x3D);
+    // cv::Mat x3Dt = x3D.t();
 
-  if ((errX1 * errX1 + errY1 * errY1) >
-      5.991 * sigmaLevel) { // Reprojection error is high
-    return -1;
-  }
+    float z1 = x3D(2);
+    if(z1 <= 0){
+        return -2;
+    }
 
-  cv::Mat x3D2 = R21 * x3D + t21;
-  cv::Point2f uv2 = pCamera2->project(x3D2);
+    float z2 = R21.row(2).dot(x3D)+Tcw2(2,3);
+    if(z2<=0){
+        return -3;
+    }
 
-  float errX2 = uv2.x - kp2.pt.x;
-  float errY2 = uv2.y - kp2.pt.y;
+    //Check reprojection error
+    Eigen::Vector2f uv1 = this->project(x3D);
 
-  if ((errX2 * errX2 + errY2 * errY2) >
-      5.991 * unc) { // Reprojection error is high
-    return -1;
-  }
+    float errX1 = uv1(0) - kp1.pt.x;
+    float errY1 = uv1(1) - kp1.pt.y;
 
-  p3D = x3D.clone();
+    if((errX1*errX1+errY1*errY1)>5.991 * sigmaLevel){   //Reprojection error is high
+        return -4;
+    }
 
-  return z1;
-}
+    Eigen::Vector3f x3D2 = R21 * x3D + Tcw2.col(3);
+    Eigen::Vector2f uv2 = pCamera2->project(x3D2);
 
-float DoubleSphere::TriangulateMatches_(
-    GeometricCamera *pCamera2, const cv::KeyPoint &kp1, const cv::KeyPoint &kp2,
-    const cv::Matx33f &R12, const cv::Matx31f &t12, const float sigmaLevel,
-    const float unc, cv::Matx31f &p3D) {
-  cv::Matx31f r1 = this->unprojectMat_(kp1.pt);
-  cv::Matx31f r2 = pCamera2->unprojectMat_(kp2.pt);
+    float errX2 = uv2(0) - kp2.pt.x;
+    float errY2 = uv2(1) - kp2.pt.y;
 
-  // Check parallax
-  cv::Matx31f r21 = R12 * r2;
+    if((errX2*errX2+errY2*errY2)>5.991 * unc){   //Reprojection error is high
+        return -5;
+    }
 
-  const float cosParallaxRays = r1.dot(r21) / (cv::norm(r1) * cv::norm(r21));
+    p3D = x3D;
 
-  if (cosParallaxRays > 0.9998) {
-    return -1;
-  }
-
-  // Parallax is good, so we try to triangulate
-  cv::Point2f p11, p22;
-
-  p11.x = r1(0);
-  p11.y = r1(1);
-
-  p22.x = r2(0);
-  p22.y = r2(1);
-
-  cv::Matx31f x3D;
-  cv::Matx44f Tcw1{1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f};
-
-  cv::Matx33f R21 = R12.t();
-  cv::Matx31f t21 = -R21 * t12;
-
-  cv::Matx44f Tcw2{R21(0, 0), R21(0, 1), R21(0, 2), t21(0),
-                   R21(1, 0), R21(1, 1), R21(1, 2), t21(1),
-                   R21(2, 0), R21(2, 1), R21(2, 2), t21(2),
-                   0.f,       0.f,       0.f,       1.f};
-
-  Triangulate_(p11, p22, Tcw1, Tcw2, x3D);
-  cv::Matx13f x3Dt = x3D.t();
-
-  float z1 = x3D(2);
-  if (z1 <= 0) {
-    return -1;
-  }
-
-  float z2 = R21.row(2).dot(x3Dt) + t21(2);
-  if (z2 <= 0) {
-    return -1;
-  }
-
-  // Check reprojection error
-  cv::Point2f uv1 = this->project(x3D);
-
-  float errX1 = uv1.x - kp1.pt.x;
-  float errY1 = uv1.y - kp1.pt.y;
-
-  if ((errX1 * errX1 + errY1 * errY1) >
-      5.991 * sigmaLevel) { // Reprojection error is high
-    return -1;
-  }
-
-  cv::Matx31f x3D2 = R21 * x3D + t21;
-  cv::Point2f uv2 = pCamera2->project(x3D2);
-
-  float errX2 = uv2.x - kp2.pt.x;
-  float errY2 = uv2.y - kp2.pt.y;
-
-  if ((errX2 * errX2 + errY2 * errY2) >
-      5.991 * unc) { // Reprojection error is high
-    return -1;
-  }
-
-  p3D = x3D;
-
-  return z1;
+    return z1;
 }
 
 std::ostream &operator<<(std::ostream &os, const DoubleSphere &kb) {
@@ -633,40 +446,17 @@ std::istream &operator>>(std::istream &is, DoubleSphere &kb) {
   return is;
 }
 
-void DoubleSphere::Triangulate(const cv::Point2f &p1, const cv::Point2f &p2,
-                               const cv::Mat &Tcw1, const cv::Mat &Tcw2,
-                               cv::Mat &x3D) {
-  cv::Mat A(4, 4, CV_32F);
+void DoubleSphere::Triangulate(const cv::Point2f &p1, const cv::Point2f &p2, const Eigen::Matrix<float,3,4> &Tcw1,
+                               const Eigen::Matrix<float,3,4> &Tcw2, Eigen::Vector3f &x3D)
+{
+  Eigen::Matrix<float,4,4> A;
+  A.row(0) = p1.x*Tcw1.row(2)-Tcw1.row(0);
+  A.row(1) = p1.y*Tcw1.row(2)-Tcw1.row(1);
+  A.row(2) = p2.x*Tcw2.row(2)-Tcw2.row(0);
+  A.row(3) = p2.y*Tcw2.row(2)-Tcw2.row(1);
 
-  A.row(0) = p1.x * Tcw1.row(2) - Tcw1.row(0);
-  A.row(1) = p1.y * Tcw1.row(2) - Tcw1.row(1);
-  A.row(2) = p2.x * Tcw2.row(2) - Tcw2.row(0);
-  A.row(3) = p2.y * Tcw2.row(2) - Tcw2.row(1);
-
-  cv::Mat u, w, vt;
-  cv::SVD::compute(A, w, u, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
-  x3D = vt.row(3).t();
-  x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
-}
-
-void DoubleSphere::Triangulate_(const cv::Point2f &p1, const cv::Point2f &p2,
-                                const cv::Matx44f &Tcw1,
-                                const cv::Matx44f &Tcw2, cv::Matx31f &x3D) {
-  cv::Matx14f A0, A1, A2, A3;
-
-  A0 = p1.x * Tcw1.row(2) - Tcw1.row(0);
-  A1 = p1.y * Tcw1.row(2) - Tcw1.row(1);
-  A2 = p2.x * Tcw2.row(2) - Tcw2.row(0);
-  A3 = p2.y * Tcw2.row(2) - Tcw2.row(1);
-  cv::Matx44f A{A0(0), A0(1), A0(2), A0(3), A1(0), A1(1), A1(2), A1(3),
-                A2(0), A2(1), A2(2), A2(3), A3(0), A3(1), A3(2), A3(3)};
-
-  // cv::Mat u,w,vt;
-  cv::Matx44f u, vt;
-  cv::Matx41f w;
-
-  cv::SVD::compute(A, w, u, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
-  cv::Matx41f x3D_h = vt.row(3).t();
-  x3D = x3D_h.get_minor<3, 1>(0, 0) / x3D_h(3);
+  Eigen::JacobiSVD<Eigen::Matrix4f> svd(A, Eigen::ComputeFullV);
+  Eigen::Vector4f x3Dh = svd.matrixV().col(3);
+  x3D = x3Dh.head(3)/x3Dh(3);
 }
 } // namespace ORB_SLAM3
