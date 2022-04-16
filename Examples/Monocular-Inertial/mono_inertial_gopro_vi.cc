@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     if (!success) {
       cnt_empty_frame++;
       std::cout<<"Empty frame...\n";
-      if (cnt_empty_frame > 1000)
+      if (cnt_empty_frame > 100)
         break;
       continue;
     }

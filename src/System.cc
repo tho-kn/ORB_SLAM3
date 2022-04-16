@@ -38,6 +38,11 @@ namespace ORB_SLAM3
 
 Verbose::eLevel Verbose::th = Verbose::VERBOSITY_NORMAL;
 
+bool has_suffix(const std::string &str, const std::string &suffix) {
+  std::size_t index = str.find(suffix, str.size() - suffix.size());
+  return (index != std::string::npos);
+}
+
 System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
                const bool bUseViewer, const int initFr, const string &strSequence):
     mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false), mbResetActiveMap(false),
@@ -109,13 +114,18 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     bool loadedAtlas = false;
 
+    bool bVocLoad = false;
+    mpVocabulary = new ORBVocabulary();
+    if (has_suffix(strVocFile, ".txt"))
+      bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+    else
+      bVocLoad = mpVocabulary->loadFromBinaryFile(strVocFile);
+
     if(mStrLoadAtlasFromFile.empty())
     {
         //Load ORB Vocabulary
         cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
 
-        mpVocabulary = new ORBVocabulary();
-        bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
         if(!bVocLoad)
         {
             cerr << "Wrong path to vocabulary. " << endl;
@@ -136,8 +146,6 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         //Load ORB Vocabulary
         cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
 
-        mpVocabulary = new ORBVocabulary();
-        bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
         if(!bVocLoad)
         {
             cerr << "Wrong path to vocabulary. " << endl;
@@ -1408,9 +1416,7 @@ void System::SaveAtlas(int type){
         // Save the current session
         mpAtlas->PreSave();
 
-        string pathSaveFileName = "./";
-        pathSaveFileName = pathSaveFileName.append(mStrSaveAtlasToFile);
-        pathSaveFileName = pathSaveFileName.append(".osa");
+        string pathSaveFileName = mStrSaveAtlasToFile;
 
         string strVocabularyChecksum = CalculateCheckSum(mStrVocabularyFilePath,TEXT_FILE);
         std::size_t found = mStrVocabularyFilePath.find_last_of("/\\");
@@ -1447,9 +1453,7 @@ bool System::LoadAtlas(int type)
     string strFileVoc, strVocChecksum;
     bool isRead = false;
 
-    string pathLoadFileName = "./";
-    pathLoadFileName = pathLoadFileName.append(mStrLoadAtlasFromFile);
-    pathLoadFileName = pathLoadFileName.append(".osa");
+    string pathLoadFileName = mStrLoadAtlasFromFile;
 
     if(type == TEXT_FILE) // File text
     {

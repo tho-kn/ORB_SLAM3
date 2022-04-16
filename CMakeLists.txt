@@ -12,11 +12,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -O3")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 
-# Check C++11 or C++0x support
+# Check C++14 or C++0x support
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
+if(COMPILER_SUPPORTS_CXX14)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
    add_definitions(-DCOMPILEDWITHC14)
    message(STATUS "Using flag -std=c++14.")
@@ -83,6 +83,7 @@ src/GeometricTools.cc
 src/TwoViewReconstruction.cc
 src/Config.cc
 src/Settings.cc
+src/jsonl_reader.cc
 include/System.h
 include/Tracking.h
 include/LocalMapping.h
@@ -113,7 +114,11 @@ include/GeometricTools.h
 include/TwoViewReconstruction.h
 include/SerializationUtils.h
 include/Config.h
-include/Settings.h)
+include/Settings.h
+include/jsonl_reader.h
+include/imu_sync.h
+
+)
 
 add_subdirectory(Thirdparty/g2o)
 
@@ -169,6 +174,10 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/Stereo)
 add_executable(stereo_zed_2i
         Examples/Stereo/stereo_zed_2i.cc)
 target_link_libraries(stereo_zed_2i ${PROJECT_NAME})
+
+add_executable(stereo_zed_2i_json
+        Examples/Stereo/stereo_zed_2i_json.cc)
+target_link_libraries(stereo_zed_2i_json ${PROJECT_NAME})
 
 add_executable(stereo_kitti
         Examples/Stereo/stereo_kitti.cc)
@@ -289,6 +298,9 @@ add_executable(stereo_zed_2i_vi
         Examples/Stereo-Inertial/stereo_zed_2i_vi.cc)
 target_link_libraries(stereo_zed_2i_vi ${PROJECT_NAME})
 
+add_executable(stereo_zed_2i_vi_json
+        Examples/Stereo-Inertial/stereo_zed_2i_vi_json.cc)
+target_link_libraries(stereo_zed_2i_vi_json ${PROJECT_NAME})
 #Old examples
 
 # RGB-D examples

@@ -45,7 +45,6 @@ int main(int argc, char **argv) {
      cerr << "Failed to open settings file at: " << argv[2] << endl;
      exit(-1);
   }
-  cv::Size img_size(fsSettings["Camera.width"],fsSettings["Camera.height"]);
   fsSettings.release();
 
   // Retrieve paths to images
@@ -76,14 +75,13 @@ int main(int argc, char **argv) {
     if (!success) {
       cnt_empty_frame++;
       std::cout<<"Empty frame...\n";
-      if (cnt_empty_frame > 1000)
+      if (cnt_empty_frame > 100)
         break;
       continue;
     }
       im_track = im.clone();
       double tframe = cap.get(cv::CAP_PROP_POS_MSEC) * 1e-3;
       ++img_id;
-      cv::resize(im_track, im_track, img_size);
 
 #ifdef COMPILEDWITHC14
       std::chrono::steady_clock::time_point t1 =
