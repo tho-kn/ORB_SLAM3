@@ -1,5 +1,5 @@
 # Your package name, while not written in document, this packages are needed for compilation
-PACKAGE="libssl-dev libboost-dev"
+PACKAGE="libssl-dev libboost-dev libboost-serialization-dev"
 
 # Check if we are root
 if [ "$EUID" -ne 0 ]
