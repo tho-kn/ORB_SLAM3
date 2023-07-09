@@ -1,3 +1,17 @@
+# Your package name, while not written in document, this packages are needed for compilation
+PACKAGE="libssl-dev libboost-dev"
+
+# Check if we are root
+if [ "$EUID" -ne 0 ]
+  then echo "Not root user, using sudo for installation"
+  # Not root user, use sudo
+  sudo apt-get install -y $PACKAGE
+else
+  echo "Root user, installing without sudo"
+  # Root user, no need for sudo
+  apt-get install -y $PACKAGE
+fi
+
 echo "Configuring and building Thirdparty/DBoW2 ..."
 
 cd Thirdparty/DBoW2
